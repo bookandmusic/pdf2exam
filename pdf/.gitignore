@@ -1,0 +1,25 @@
+# 资源文件
+resource/
+*.pdf
+*.png
+*.jpg
+*.jpeg
+*.bmp
+*.tiff
+*.webp
+
+# 输出数据
+*.json
+
+# 日志
+*.log
+
+# 环境配置
+.env
+.env.*
+
+
+
+# 虚拟环境
+.venv/
+__pycache__/

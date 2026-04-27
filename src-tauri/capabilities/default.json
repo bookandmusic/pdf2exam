@@ -1,0 +1,16 @@
+{
+  "identifier": "default",
+  "permissions": [
+    "dialog:allow-open",
+    "fs:allow-read-text-file",
+    "fs:allow-write-text-file",
+    {
+      "identifier": "fs:allow-appdata-read",
+      "allow": ["**"]
+    },
+    {
+      "identifier": "fs:allow-appdata-write",
+      "allow": ["**"]
+    }
+  ]
+}

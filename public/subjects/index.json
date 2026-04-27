@@ -1,0 +1,14 @@
+[
+  {
+    "id": "patent-law-600",
+    "name": "专利法 600",
+    "file": "专利法-600.json",
+    "questionCount": 779
+  },
+  {
+    "id": "related-law-600",
+    "name": "相关法 600",
+    "file": "相关法-600.json",
+    "questionCount": 1589
+  }
+]
