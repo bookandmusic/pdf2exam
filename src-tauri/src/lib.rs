@@ -180,7 +180,7 @@ async fn sync_from_remote(app: tauri::AppHandle) -> Result<Vec<serde_json::Value
     // Import to local storage
     let path = get_storage_path(&app);
     let mut bank = load_storage_file(&path);
-    bank.questions.extend(questions);
+    bank.questions.extend(questions.clone());
     save_storage_file(&path, &bank);
 
     Ok(questions)
