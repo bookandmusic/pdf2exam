@@ -10,6 +10,9 @@ export interface Question {
   knowledge?: string
   difficulty?: number
   chapterId?: string
+  topic?: string
+  chapter?: string
+  section?: string
 }
 
 export interface Chapter {
@@ -17,18 +20,18 @@ export interface Chapter {
   name: string
 }
 
-export interface SubjectMeta {
-  id: string
-  name: string
-  file: string
-  questionCount: number
-}
-
 export interface Subject {
   id: string
   name: string
   chapters: Chapter[]
   questions: Question[]
+}
+
+export interface FilterNode {
+  id: string
+  label: string
+  count: number
+  children?: FilterNode[]
 }
 
 export interface ExamPaper {
@@ -54,18 +57,4 @@ export interface ExamSession {
   currentIndex: number
   isComplete: boolean
   pointsPerQuestion: number
-}
-
-export type SyncType = 'http' | 'webdav' | 's3'
-
-export interface SyncConfig {
-  type: SyncType
-  url: string
-  token?: string
-  username?: string
-  password?: string
-  accessKey?: string
-  secretKey?: string
-  region?: string
-  bucket?: string
 }

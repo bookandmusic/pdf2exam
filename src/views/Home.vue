@@ -53,7 +53,7 @@
         <div v-if="subjects.length > 0" class="stats-filter-summary">
           <span class="filter-chip">{{ subjectLabel }}</span>
           <span class="filter-divider">·</span>
-          <span class="filter-chip">{{ chapterLabel }}</span>
+          <span class="filter-chip">{{ filterLabel }}</span>
         </div>
       </div>
       <svg
@@ -243,13 +243,13 @@
     <FilterDrawer
       :visible="showDrawer"
       :subjects="subjects"
-      :chapters="chapters"
+      :filter-tree="filterTree"
       :selected-subject-ids="currentSubjectIds"
-      :selected-chapter-ids="currentChapterIds"
+      :selected-section-ids="currentSectionIds"
       @close="showDrawer = false"
-      @toggle-subject="toggleSubject"
-      @toggle-chapter="toggleChapter"
-      @clear-chapters="clearChapters"
+      @select-subject="selectSubject"
+      @toggle-section="toggleSection"
+      @clear-filters="clearFilters"
       @reset="resetFilters"
     />
   </div>
@@ -259,7 +259,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useQuestionBank } from '../stores/questionBank'
 import { useWrongQuestions } from '../stores/wrongQuestions'
-import type { Question } from '../types/question'
+import type { Question, FilterNode } from '../types/question'
 import FilterDrawer from '../components/FilterDrawer.vue'
 
 const {
@@ -270,13 +270,13 @@ const {
   importJson,
   subjects,
   currentSubjectIds,
-  currentChapterIds,
-  chapters,
+  currentSectionIds,
+  filterTree,
   filteredQuestions,
   loadBuiltinSubjects,
-  toggleSubject,
-  toggleChapter,
-  clearChapters,
+  selectSubject,
+  toggleSection,
+  clearFilters,
   resetFilters,
 } = useQuestionBank()
 const { wrongIds } = useWrongQuestions()
@@ -290,20 +290,28 @@ const wrongCount = computed(() => {
 
 const subjectLabel = computed(() => {
   if (currentSubjectIds.value.length === 0) return '全部科目'
-  if (currentSubjectIds.value.length === 1) {
-    const s = subjects.value.find((s) => s.id === currentSubjectIds.value[0])
-    return s ? s.name : '已选 1 个科目'
-  }
-  return `已选 ${currentSubjectIds.value.length} 个科目`
+  const s = subjects.value.find((s) => s.id === currentSubjectIds.value[0])
+  return s ? s.name : '已选 1 个科目'
 })
 
-const chapterLabel = computed(() => {
-  if (currentChapterIds.value.length === 0) return '全部章节'
-  if (currentChapterIds.value.length === 1) {
-    const ch = chapters.value.find((c) => c.id === currentChapterIds.value[0])
-    return ch ? ch.name : '已选 1 个章节'
+function findFilterLabel(id: string, nodes: FilterNode[]): string | null {
+  for (const n of nodes) {
+    if (n.id === id) return n.label
+    if (n.children) {
+      const found = findFilterLabel(id, n.children)
+      if (found) return found
+    }
   }
-  return `已选 ${currentChapterIds.value.length} 个章节`
+  return null
+}
+
+const filterLabel = computed(() => {
+  if (currentSectionIds.value.length === 0) return '全部章节'
+  if (currentSectionIds.value.length === 1) {
+    const label = findFilterLabel(currentSectionIds.value[0], filterTree.value)
+    return label || '已选 1 项'
+  }
+  return `已选 ${currentSectionIds.value.length} 项`
 })
 
 onMounted(async () => {
@@ -331,7 +339,7 @@ onMounted(async () => {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  padding-top: var(--space-2);
+  padding-top: var(--space-1);
   margin-bottom: var(--space-6);
 }
 
@@ -392,7 +400,10 @@ onMounted(async () => {
   align-items: center;
   gap: var(--space-4);
   padding: var(--space-4) var(--space-5);
-  background: var(--bg-surface);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-sm);
   margin-bottom: var(--space-6);
@@ -504,7 +515,10 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   padding: var(--space-4) var(--space-5);
-  background: var(--bg-surface);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-sm);
   cursor: pointer;
@@ -709,6 +723,31 @@ onMounted(async () => {
    Footer Spacer
    ======================================== */
 .footer-spacer {
-  height: var(--space-8);
+  height: calc(var(--space-6) + var(--safe-bottom));
+}
+
+@media (max-width: 640px) {
+  .large-title {
+    font-size: 31px;
+  }
+
+  .stats-card,
+  .mode-card {
+    padding: var(--space-4);
+  }
+
+  .stats-top {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
+  .stats-filter-summary {
+    flex-wrap: wrap;
+    line-height: 1.4;
+  }
+
+  .filter-chip {
+    max-width: none;
+  }
 }
 </style>

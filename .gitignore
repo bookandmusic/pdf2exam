@@ -42,3 +42,4 @@ src-tauri/target/
 *.keystore
 .venv
 *.pdf
+public/resource

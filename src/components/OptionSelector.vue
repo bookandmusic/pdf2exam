@@ -87,14 +87,14 @@ function handleSelect(key: string) {
 
 .option-btn {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-3);
   width: 100%;
   min-height: 52px;
   padding: 14px 16px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-default);
-  background: var(--bg-surface);
+  background: rgba(255, 255, 255, 0.72);
   color: var(--text-primary);
   text-align: left;
   cursor: pointer;
@@ -114,7 +114,7 @@ function handleSelect(key: string) {
 
 /* Selected (before answer reveal) */
 .option-btn.selected {
-  background: rgba(99, 102, 241, 0.08);
+  background: rgba(10, 132, 255, 0.1);
   border-color: var(--c-primary);
 }
 
@@ -154,6 +154,7 @@ function handleSelect(key: string) {
   align-items: center;
   color: var(--text-tertiary);
   transition: color var(--duration-fast) var(--ease-out);
+  margin-top: 1px;
 }
 
 .opt-label {

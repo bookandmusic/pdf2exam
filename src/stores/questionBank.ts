@@ -1,12 +1,6 @@
 import { ref, computed } from 'vue'
-import type { Question, Subject, SubjectMeta } from '../types/question'
-import {
-  loadQuestionBank,
-  importQuestions,
-  clearQuestionBank,
-  deleteQuestion,
-  syncFromRemote,
-} from '../lib/tauri'
+import type { Question, Subject, FilterNode } from '../types/question'
+import { loadQuestionBank, importQuestions, clearQuestionBank, deleteQuestion } from '../lib/tauri'
 
 const questions = ref<Question[]>([])
 const isLoading = ref(false)
@@ -14,12 +8,11 @@ const error = ref<string | null>(null)
 
 const subjects = ref<Subject[]>([])
 const currentSubjectIds = ref<string[]>([])
-const currentChapterIds = ref<string[]>([])
+const currentSectionIds = ref<string[]>([])
 
 const STORAGE_SUBJECT_KEY = 'pdf2exam_subjects'
-const STORAGE_CHAPTER_KEY = 'pdf2exam_chapters'
+const STORAGE_SECTION_KEY = 'pdf2exam_sections'
 
-// Restore last selection
 try {
   const saved = localStorage.getItem(STORAGE_SUBJECT_KEY)
   if (saved) currentSubjectIds.value = JSON.parse(saved)
@@ -27,49 +20,106 @@ try {
   /* ignore */
 }
 try {
-  const saved = localStorage.getItem(STORAGE_CHAPTER_KEY)
-  if (saved) currentChapterIds.value = JSON.parse(saved)
+  const saved = localStorage.getItem(STORAGE_SECTION_KEY)
+  if (saved) currentSectionIds.value = JSON.parse(saved)
 } catch {
   /* ignore */
 }
 
-/** Chapters from currently selected subjects (or all subjects if none selected) */
-const chapters = computed(() => {
+const filterTree = computed<FilterNode[]>(() => {
   const target =
     currentSubjectIds.value.length > 0
       ? subjects.value.filter((s) => currentSubjectIds.value.includes(s.id))
       : subjects.value
-  const map = new Map<string, { id: string; name: string; subjectName: string }>()
+  const tree: FilterNode[] = []
+
   for (const s of target) {
     for (const ch of s.chapters) {
-      if (!map.has(ch.id)) {
-        map.set(ch.id, { id: ch.id, name: ch.name, subjectName: s.name })
+      const topicNode: FilterNode = { id: ch.id, label: ch.name, count: 0 }
+      const chapterMap = new Map<string, FilterNode>()
+      const sectionMap = new Map<string, number>()
+
+      for (const q of s.questions) {
+        if (q.chapterId !== ch.id) continue
+        topicNode.count++
+
+        if (q.chapter) {
+          const chId = `${ch.id}||${q.chapter}`
+          if (!chapterMap.has(chId)) {
+            chapterMap.set(chId, { id: chId, label: q.chapter, count: 0 })
+          }
+          chapterMap.get(chId)!.count++
+
+          if (q.section) {
+            const secId = `${ch.id}||${q.chapter}||${q.section}`
+            sectionMap.set(secId, (sectionMap.get(secId) || 0) + 1)
+            const chNode = chapterMap.get(chId)!
+            if (!chNode.children) chNode.children = []
+            const existing = chNode.children.find((n) => n.id === secId)
+            if (!existing) {
+              chNode.children.push({ id: secId, label: q.section, count: 0 })
+            }
+            chNode.children.find((n) => n.id === secId)!.count++
+          }
+        }
       }
+
+      if (chapterMap.size > 0) {
+        topicNode.children = Array.from(chapterMap.values())
+        for (const c of topicNode.children) {
+          if (c.children) {
+            const seen = new Map<string, FilterNode>()
+            for (const sec of c.children) {
+              seen.set(sec.id, sec)
+            }
+            c.children = Array.from(seen.values())
+          }
+        }
+      }
+
+      tree.push(topicNode)
     }
   }
-  return Array.from(map.values())
+
+  return tree
 })
 
 const filteredQuestions = computed<Question[]>(() => {
   if (subjects.value.length > 0) {
-    // Built-in subjects mode
     const target =
       currentSubjectIds.value.length > 0
         ? subjects.value.filter((s) => currentSubjectIds.value.includes(s.id))
         : subjects.value
     let qs = target.flatMap((s) => s.questions)
-    if (currentChapterIds.value.length > 0) {
-      qs = qs.filter((q) => q.chapterId && currentChapterIds.value.includes(q.chapterId))
+
+    if (currentSectionIds.value.length > 0) {
+      const l3 = new Set(currentSectionIds.value.filter((id) => id.split('||').length === 3))
+      const l2 = new Set(currentSectionIds.value.filter((id) => id.split('||').length === 2))
+      const l1 = new Set(currentSectionIds.value.filter((id) => id.split('||').length === 1))
+      qs = qs.filter((q) => {
+        if (l3.size > 0) {
+          const key = `${q.chapterId || ''}||${q.chapter || ''}||${q.section || ''}`
+          if (l3.has(key)) return true
+        }
+        if (l2.size > 0) {
+          const key = `${q.chapterId || ''}||${q.chapter || ''}`
+          if (l2.has(key)) return true
+        }
+        if (l1.size > 0) {
+          if (q.chapterId && l1.has(q.chapterId)) return true
+        }
+        return false
+      })
     }
+
     return qs
   }
-  // Fallback to Tauri questions
   return questions.value
 })
 
 function saveSelection() {
   localStorage.setItem(STORAGE_SUBJECT_KEY, JSON.stringify(currentSubjectIds.value))
-  localStorage.setItem(STORAGE_CHAPTER_KEY, JSON.stringify(currentChapterIds.value))
+  localStorage.setItem(STORAGE_SECTION_KEY, JSON.stringify(currentSectionIds.value))
 }
 
 export function useQuestionBank() {
@@ -93,20 +143,6 @@ export function useQuestionBank() {
     await load()
   }
 
-  async function syncRemote() {
-    isLoading.value = true
-    error.value = null
-    try {
-      const data = await syncFromRemote()
-      questions.value = data
-    } catch (e: unknown) {
-      error.value = e instanceof Error ? e.message : String(e)
-      throw e
-    } finally {
-      isLoading.value = false
-    }
-  }
-
   async function clear() {
     await clearQuestionBank()
     questions.value = []
@@ -121,31 +157,45 @@ export function useQuestionBank() {
     isLoading.value = true
     error.value = null
     try {
-      const resp = await fetch('/subjects/index.json')
-      if (!resp.ok) return
-      const manifest: SubjectMeta[] = await resp.json()
+      const subjectFiles = [
+        { id: 'patent-law', file: '专利法.json' },
+        { id: 'related-law', file: '相关法.json' },
+      ]
       const loaded: Subject[] = []
-      for (const m of manifest) {
-        const r = await fetch(`/subjects/${m.file}`)
+      for (const entry of subjectFiles) {
+        const r = await fetch(`/subjects/${entry.file}`)
         if (!r.ok) continue
         const data = await r.json()
-        data.questions?.forEach((q: Question) => {
-          if (!q.chapterId) q.chapterId = 'default'
-        })
+        data.id = entry.id
+        if (data.questions) {
+          for (const q of data.questions) {
+            if (!q.chapterId) q.chapterId = 'default'
+            q.chapterId = `${entry.id}-${q.chapterId}`
+          }
+        }
+        if (data.chapters) {
+          for (const ch of data.chapters) {
+            ch.id = `${entry.id}-${ch.id}`
+          }
+        }
         loaded.push(data)
       }
       subjects.value = loaded
-      // Filter out saved subject IDs that no longer exist
       currentSubjectIds.value = currentSubjectIds.value.filter((id) =>
         loaded.some((s) => s.id === id)
       )
-      // If none selected, select the first subject
       if (currentSubjectIds.value.length === 0 && loaded.length > 0) {
         currentSubjectIds.value = [loaded[0].id]
       }
-      // Remove chapter IDs not in available chapters
-      const allChapterIds = new Set(chapters.value.map((c) => c.id))
-      currentChapterIds.value = currentChapterIds.value.filter((id) => allChapterIds.has(id))
+      const allSectionIds = new Set<string>()
+      for (const s of subjects.value) {
+        for (const ch of s.chapters) allSectionIds.add(ch.id)
+        for (const q of s.questions) {
+          if (q.chapter) allSectionIds.add(`${q.chapterId}||${q.chapter}`)
+          if (q.section) allSectionIds.add(`${q.chapterId}||${q.chapter}||${q.section}`)
+        }
+      }
+      currentSectionIds.value = currentSectionIds.value.filter((id) => allSectionIds.has(id))
       saveSelection()
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : String(e)
@@ -154,46 +204,36 @@ export function useQuestionBank() {
     }
   }
 
-  /** Toggle a subject on/off */
-  function toggleSubject(id: string) {
-    const idx = currentSubjectIds.value.indexOf(id)
+  function selectSubject(id: string) {
+    currentSubjectIds.value = [id]
+    currentSectionIds.value = currentSectionIds.value.filter((sid) =>
+      subjects.value
+        .find((s) => s.id === id)
+        ?.questions.some((q) => sid.startsWith(q.chapterId || '') || sid === q.chapterId)
+    )
+    saveSelection()
+  }
+
+  function toggleSection(id: string) {
+    const idx = currentSectionIds.value.indexOf(id)
     if (idx >= 0) {
-      currentSubjectIds.value.splice(idx, 1)
-      // Remove chapters that belonged only to this subject
-      const subj = subjects.value.find((s) => s.id === id)
-      if (subj) {
-        const chIds = new Set(subj.chapters.map((c) => c.id))
-        currentChapterIds.value = currentChapterIds.value.filter((cid) => !chIds.has(cid))
-      }
+      currentSectionIds.value.splice(idx, 1)
     } else {
-      currentSubjectIds.value.push(id)
+      currentSectionIds.value.push(id)
     }
     saveSelection()
   }
 
-  /** Toggle a chapter on/off */
-  function toggleChapter(id: string) {
-    const idx = currentChapterIds.value.indexOf(id)
-    if (idx >= 0) {
-      currentChapterIds.value.splice(idx, 1)
-    } else {
-      currentChapterIds.value.push(id)
-    }
+  function clearFilters() {
+    currentSectionIds.value = []
     saveSelection()
   }
 
-  /** Clear all chapter filters */
-  function clearChapters() {
-    currentChapterIds.value = []
-    saveSelection()
-  }
-
-  /** Reset all filters (select first subject, clear chapters) */
   function resetFilters() {
     if (subjects.value.length > 0) {
       currentSubjectIds.value = [subjects.value[0].id]
     }
-    currentChapterIds.value = []
+    currentSectionIds.value = []
     saveSelection()
   }
 
@@ -201,21 +241,20 @@ export function useQuestionBank() {
     questions,
     subjects,
     currentSubjectIds,
-    currentChapterIds,
-    chapters,
+    currentSectionIds,
+    filterTree,
     filteredQuestions,
     count,
     isLoading,
     error,
     load,
     importJson,
-    syncRemote,
     clear,
     remove,
     loadBuiltinSubjects,
-    toggleSubject,
-    toggleChapter,
-    clearChapters,
+    selectSubject,
+    toggleSection,
+    clearFilters,
     resetFilters,
   }
 }

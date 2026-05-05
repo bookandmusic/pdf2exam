@@ -1,5 +1,5 @@
 <template>
-  <div class="score-summary glass-card">
+  <div class="score-summary">
     <div class="score-display">
       <div class="score-ring">
         <svg viewBox="0 0 120 120" class="score-svg">
@@ -80,8 +80,15 @@ const dashOffset = computed(() => {
 .score-summary {
   padding: var(--space-8) var(--space-6);
   text-align: center;
+  width: 100%;
   max-width: 420px;
   margin: 0 auto;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  border-radius: 28px;
+  box-shadow: var(--shadow-lg);
 }
 
 .score-display {
@@ -129,6 +136,9 @@ const dashOffset = computed(() => {
   justify-content: center;
   gap: var(--space-6);
   margin-bottom: var(--space-6);
+  padding: var(--space-4);
+  background: rgba(255, 255, 255, 0.42);
+  border-radius: 20px;
 }
 
 .stat {

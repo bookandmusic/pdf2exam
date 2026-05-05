@@ -1,80 +1,92 @@
 <template>
-  <div class="mock-exam page">
-    <!-- Top bar: back + timer + submit -->
-    <div class="exam-top-bar">
-      <button class="exam-back-btn" @click="handleBack">
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.5"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <path d="M19 12H5M12 19l-7-7 7-7" />
-        </svg>
-        退出
-      </button>
-      <div :class="['exam-timer', { urgent: remaining <= 60 }]">
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <circle cx="12" cy="12" r="10" />
-          <polyline points="12 6 12 12 16 14" />
-        </svg>
-        {{ formattedTime }}
+  <div class="mock-exam-page mobile-shell">
+    <div class="sticky-header mobile-topbar">
+      <div class="header-content mobile-topbar-content">
+        <button class="back-btn" @click="handleBack">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M19 12H5M12 19l-7-7 7-7" />
+          </svg>
+          退出
+        </button>
+        <div :class="['exam-timer', { urgent: remaining <= 60 }]">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+          </svg>
+          {{ formattedTime }}
+        </div>
+        <button class="submit-btn" @click="confirmSubmit = true">交卷</button>
       </div>
-      <button class="exam-submit-btn" @click="confirmSubmit = true">交卷</button>
+      <ProgressBar :current="currentIndex + 1" :total="totalQuestions" />
     </div>
 
-    <ProgressBar :current="currentIndex + 1" :total="totalQuestions" />
-
-    <div v-if="currentQuestion" class="fade-in">
-      <QuestionCard
-        :question="currentQuestion"
-        :show-answer="false"
-        :current-answer="currentAnswer"
-      >
-        <template #options>
-          <OptionSelector
-            :options="currentQuestion.options"
-            :selected="selected"
-            :show-answer="false"
-            :correct-answer="
-              currentQuestion.type === 'multiple'
-                ? currentQuestion.answers || []
-                : currentQuestion.answer
-            "
-            :mode="currentQuestion.type || 'single'"
-            :disabled="false"
-            @select="handleSelect"
-          />
-        </template>
-      </QuestionCard>
-
-      <div class="nav-bar">
-        <button class="btn btn-ghost" @click="handlePrev" :disabled="isFirst">上一题</button>
-        <span class="nav-info">第 {{ currentIndex + 1 }} / {{ totalQuestions }} 题</span>
-        <button v-if="!isLast" class="btn btn-primary" @click="next">下一题</button>
-        <button v-else class="btn btn-primary" @click="next" disabled>最后一题</button>
+    <div class="exam-main">
+      <div class="scrollable-content exam-question-scroll">
+        <div class="content-inner mobile-content">
+          <div v-if="currentQuestion" class="fade-in">
+            <QuestionCard
+              :question="currentQuestion"
+              :show-answer="false"
+              :current-answer="currentAnswer"
+            >
+              <template #options>
+                <OptionSelector
+                  :options="currentQuestion.options"
+                  :selected="selected"
+                  :show-answer="false"
+                  :correct-answer="
+                    currentQuestion.type === 'multiple'
+                      ? currentQuestion.answers || []
+                      : currentQuestion.answer
+                  "
+                  :mode="currentQuestion.type || 'single'"
+                  :disabled="false"
+                  @select="handleSelect"
+                />
+              </template>
+            </QuestionCard>
+          </div>
+        </div>
       </div>
 
-      <div class="progress-dots">
-        <span
-          v-for="(q, i) in sessionQuestions"
-          :key="q.id"
-          :class="['dot', { answered: answers[i], current: i === currentIndex }]"
-          @click="handleGoTo(i)"
-        ></span>
+      <div v-if="currentQuestion" class="mobile-bottom-bar exam-bottom-bar">
+        <div class="mobile-bottom-panel">
+          <div class="progress-dots exam-progress-dots">
+            <span
+              v-for="(q, i) in sessionQuestions"
+              :key="q.id"
+              :class="['dot', { answered: answers[i], current: i === currentIndex }]"
+              @click="handleGoTo(i)"
+            ></span>
+          </div>
+
+          <div class="exam-nav-bar mobile-actions-grid mobile-actions-split">
+            <button class="btn btn-ghost" @click="handlePrev" :disabled="isFirst">上一题</button>
+            <span class="nav-info mobile-progress-meta"
+              >第 {{ currentIndex + 1 }} / {{ totalQuestions }} 题</span
+            >
+            <button v-if="!isLast" class="btn btn-primary" @click="next">下一题</button>
+            <button v-else class="btn btn-primary" @click="next" disabled>最后一题</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -103,6 +115,32 @@
         <div class="modal-actions">
           <button class="btn-row btn-row-cancel" @click="confirmSubmit = false">继续答题</button>
           <button class="btn-row btn-row-submit" @click="doSubmit">确认交卷</button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="confirmExit" class="modal-overlay" @click.self="confirmExit = false">
+      <div class="modal">
+        <div class="modal-icon-wrap">
+          <svg
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 8v4M12 16h.01" />
+          </svg>
+        </div>
+        <p class="modal-text">确定要退出考试吗？</p>
+        <p class="modal-text muted">当前答题进度将不会保留。</p>
+        <div class="modal-actions">
+          <button class="btn-row btn-row-cancel" @click="confirmExit = false">继续答题</button>
+          <button class="btn-row btn-row-submit" @click="doExit">确认退出</button>
         </div>
       </div>
     </div>
@@ -176,6 +214,7 @@ const MOCK_DURATION_KEY = 'mock_exam_duration'
 const remaining = ref(0)
 let timerInterval: ReturnType<typeof setInterval> | null = null
 const confirmSubmit = ref(false)
+const confirmExit = ref(false)
 const showTimeUp = ref(false)
 
 const formattedTime = computed(() => {
@@ -283,17 +322,18 @@ function autoSubmit() {
   showTimeUp.value = true
 }
 
+function doExit() {
+  confirmExit.value = false
+  clearTimer()
+  resetSession()
+  router.push('/')
+}
+
 function handleBack() {
   if (answeredCount.value > 0) {
-    if (confirm('确定要退出考试吗？当前进度将丢失。')) {
-      clearTimer()
-      resetSession()
-      router.push('/')
-    }
+    confirmExit.value = true
   } else {
-    clearTimer()
-    resetSession()
-    router.push('/')
+    doExit()
   }
 }
 
@@ -330,45 +370,63 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* ========================================
-   Top Bar
-   ======================================== */
-.exam-top-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-1) 0 var(--space-4);
-  min-height: 44px;
+/* 根容器 */
+.mock-exam-page {
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  background: transparent;
 }
 
-.exam-back-btn {
+.exam-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sticky-header {
+  flex-shrink: 0;
+  box-shadow: none;
+}
+
+.header-content {
+  min-height: 48px;
+}
+
+.back-btn {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--space-2);
   background: none;
   border: none;
   color: var(--c-primary);
   font-size: var(--text-base);
   cursor: pointer;
-  padding: var(--space-1) 0;
+  padding: var(--space-2) 0;
   min-height: 44px;
   transition: opacity var(--duration-fast) var(--ease-out);
 }
 
-.exam-back-btn:hover {
+.back-btn:hover {
   opacity: 0.7;
 }
 
-/* ─── Timer ─── */
+/* Timer */
 .exam-timer {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  font-size: var(--text-lg);
+  padding: 10px 14px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  font-size: var(--text-base);
   font-weight: var(--weight-semibold);
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
-  letter-spacing: 1px;
+  letter-spacing: 0.4px;
 }
 
 .exam-timer svg {
@@ -394,33 +452,111 @@ onUnmounted(() => {
   }
 }
 
-/* ─── Submit button ─── */
-.exam-submit-btn {
-  padding: 6px 16px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--c-error);
-  background: transparent;
+/* Submit button */
+.submit-btn {
+  min-width: 52px;
+  padding: 8px 12px;
+  border-radius: 13px;
+  border: 1px solid rgba(255, 59, 48, 0.24);
+  background: rgba(255, 59, 48, 0.08);
   color: var(--c-error);
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
   cursor: pointer;
-  min-height: 36px;
+  min-height: 38px;
   transition: all var(--duration-fast) var(--ease-out);
   white-space: nowrap;
+  justify-content: center;
+  text-align: center;
 }
 
-.exam-submit-btn:hover {
+.submit-btn:hover {
   background: var(--c-error);
   color: white;
 }
 
-.exam-submit-btn:active {
+.submit-btn:active {
   transform: scale(0.95);
 }
 
-/* ========================================
-   Confirm Modal — centered alert style
-   ======================================== */
+/* 可滚动的答题内容 */
+.scrollable-content {
+  padding-top: var(--space-3);
+}
+
+.content-inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.exam-question-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: var(--space-3) calc(var(--space-4) + var(--safe-right)) var(--space-4)
+    calc(var(--space-4) + var(--safe-left));
+}
+
+.exam-bottom-bar {
+  flex-shrink: 0;
+  position: relative;
+}
+
+.exam-progress-dots {
+  margin-top: 0;
+  margin-bottom: var(--space-3);
+}
+
+.exam-question-scroll .content-inner {
+  height: 100%;
+}
+
+.exam-question-scroll .fade-in {
+  height: 100%;
+}
+
+.exam-question-scroll :deep(.question-card) {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.exam-question-scroll :deep(.question-card) > .q-header,
+.exam-question-scroll :deep(.question-card-body) > .q-text {
+  flex-shrink: 0;
+}
+
+.exam-question-scroll :deep(.question-card-body) {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Exam navigation bar */
+.exam-nav-bar {
+  margin-top: 0;
+  padding: 0;
+  grid-template-columns: minmax(88px, 108px) minmax(0, 1fr) minmax(88px, 108px);
+}
+
+.exam-nav-bar .nav-info {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  text-align: center;
+  min-width: 0;
+}
+
+.exam-nav-bar .btn {
+  min-height: 40px;
+  padding: 8px 14px;
+  font-size: var(--text-sm);
+}
+
+/* Confirm Modal */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -534,5 +670,39 @@ onUnmounted(() => {
 
 .btn-row-submit:hover {
   opacity: 0.9;
+}
+
+@media (max-width: 640px) {
+  .header-content {
+    gap: var(--space-2);
+  }
+
+  .scrollable-content {
+    padding-top: var(--space-2);
+  }
+
+  .exam-question-scroll {
+    padding: var(--space-2) calc(var(--space-3) + var(--safe-right)) var(--space-3)
+      calc(var(--space-3) + var(--safe-left));
+  }
+
+  .exam-timer {
+    padding-inline: 12px;
+    font-size: var(--text-sm);
+  }
+
+  .submit-btn {
+    min-width: 48px;
+    padding-inline: 10px;
+    min-height: 36px;
+  }
+
+  .exam-nav-bar {
+    grid-template-columns: 84px minmax(0, 1fr) 84px;
+  }
+
+  .exam-nav-bar .btn {
+    padding-inline: 10px;
+  }
 }
 </style>

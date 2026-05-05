@@ -1,6 +1,5 @@
-import { ref, computed } from 'vue'
-
-const STORAGE_KEY = 'pdf2exam_wrong_questions'
+import { ref, computed, watch } from 'vue'
+import { useQuestionBank } from './questionBank'
 
 interface WrongEntry {
   id: string
@@ -8,10 +7,16 @@ interface WrongEntry {
 }
 
 const wrongIds = ref<WrongEntry[]>([])
+const { currentSubjectIds } = useQuestionBank()
+
+function storageKey(): string {
+  const id = currentSubjectIds.value[0] || 'default'
+  return `pdf2exam_wrong_questions_${id}`
+}
 
 function load() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(storageKey())
     wrongIds.value = raw ? JSON.parse(raw) : []
   } catch {
     wrongIds.value = []
@@ -19,10 +24,14 @@ function load() {
 }
 
 function save() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(wrongIds.value))
+  localStorage.setItem(storageKey(), JSON.stringify(wrongIds.value))
 }
 
 load()
+
+watch(currentSubjectIds, () => {
+  load()
+})
 
 export function useWrongQuestions() {
   const count = computed(() => wrongIds.value.length)

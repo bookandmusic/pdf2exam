@@ -1,12 +1,13 @@
-# H5 Games
+# 刷题助手
 
-手机游戏 App，技术栈：Vue 3 + Vite + Tauri 2 + Tailwind CSS 4
+题库练习与模拟考试 App，技术栈：Vue 3 + Vite + Tauri 2 + Tailwind CSS 4
 
 ## 功能
 
-- 游戏列表：iOS App Store 风格界面，支持分类筛选和搜索
-- 游戏模块：每个游戏独立运行，完全隔离
-- 已包含游戏：2048
+- PDF 导入：将 PDF 题库文档解析为结构化题目数据
+- 题库管理：本地存储和管理题目数据（JSON 文件）
+- 自动组卷：根据条件（分类、难度、数量）自动组合题目生成试卷
+- 答题模式：在线答题与模拟考试
 
 ## 开发
 
@@ -40,12 +41,11 @@ npm run build
 npm run tauri:build
 ```
 
-## 添加新游戏
+## 添加新题库
 
-1. 在 `src/games/` 下创建新目录
-2. 创建 `index.vue` 作为游戏入口组件
-3. 在 `src/data/games.json` 中添加游戏元数据
-4. 在 `src/views/GameView.vue` 的 `gameComponents` 中注册组件映射
+1. 准备 PDF 题库文件
+2. 使用 PDF 导入功能解析题目
+3. 在 App 中按条件组卷、答题
 
 ## 项目结构
 
@@ -53,13 +53,10 @@ npm run tauri:build
 src/
 ├── main.ts              # 应用入口
 ├── App.vue              # 根组件
-├── components/          # 公共组件
 ├── views/               # 页面视图
-├── games/               # 游戏模块（独立）
-├── data/                # 游戏列表数据
-├── router/              # 路由配置
-├── stores/              # Pinia 状态管理
-├── types/               # TypeScript 类型
+├── types/               # TypeScript 类型定义（题目、试卷）
+├── router/              # Vue Router 配置
+├── style.css            # 全局样式
 src-tauri/               # Tauri 后端（Rust）
 ```
 
