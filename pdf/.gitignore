@@ -17,6 +17,11 @@ resource/
 # 环境配置
 .env
 .env.*
+!.env.example
+
+.ruff_cache/
+.mypy_cache/
+__pycache__/
 
 
 

@@ -30,6 +30,9 @@ python extract_questions.py --dir ./pdf_images -o questions.json
 # 从第 174 页开始，每批主处理 5 页，前后各带 1 页上下文
 python extract_questions.py --dir ./pdf_images --start-from 174 --step 5 --context 1 -o questions.json --log extract.log
 
+# 只处理 174 到 220 页
+python extract_questions.py --dir ./pdf_images --start-from 174 --end-at 220 --step 5 --context 1 -o questions.json --log extract.log
+
 # 测试单张图片，默认自动带前后邻页；不带 -o 时输出到 stdout
 python extract_questions.py --test ./pdf_images/page_0174.png
 ```
@@ -51,6 +54,9 @@ python extract_questions.py --dir ./pdf_images --start-from 30 -o questions.json
 
 # 每批主处理 5 页，并额外带前后各 1 页上下文
 python extract_questions.py --dir ./pdf_images --start-from 35 --step 5 --context 1 -o questions.json --log extract.log
+
+# 只处理指定区间
+python extract_questions.py --dir ./pdf_images --start-from 35 --end-at 60 --step 5 --context 1 -o questions.json --log extract.log
 ```
 
 #### 参数说明
@@ -65,6 +71,7 @@ python extract_questions.py --dir ./pdf_images --start-from 35 --step 5 --contex
 | `--step N` | 生产模式下每批主处理页数。 | `--step 5` |
 | `--context N` | 生产模式下主批次前后各带几页上下文。 | `--context 1` |
 | `--start-from N` | 从文件名中的数字序号大于等于该值的图片开始处理。 | `--start-from 174` |
+| `--end-at N` | 处理到文件名中的数字序号小于等于该值的图片结束。 | `--end-at 220` |
 | `-o, --output FILE` | 输出 JSON 文件；不传时输出到 stdout。目录模式下支持续跑追加。 | `-o questions.json` |
 | `--log FILE` | 将运行日志写入文件。 | `--log extract.log` |
 
@@ -82,6 +89,8 @@ python extract_questions.py --dir ./pdf_images --start-from 174 --step 5 --conte
 - 第 2 批主处理 `179-183`，实际发送 `178 + 179-183 + 184`
 - 第 3 批主处理 `184-188`，实际发送 `183 + 184-188 + 189`
 
+如果额外指定 `--end-at 188`，则主批次只会处理到 `188` 为止，但最后一批仍可能附带 `189` 作为上下文页发送给模型。
+
 去重规则使用 `(chapter, number)`，因此即使上下文页重复发送，也不会重复写入题目。
 
 #### 特性
@@ -92,6 +101,7 @@ python extract_questions.py --dir ./pdf_images --start-from 174 --step 5 --conte
 - 多章节自动识别，每道题独立标注所属章节
 - 断点续跑：重复运行只追加新题，不覆盖已有结果
 - 支持从指定图片序号继续处理，适合中途失败后从某页恢复
+- 支持限制处理结束图片序号，适合按区间抽取
 - 日志记录：`--log` 参数输出到文件
 - 环境变量配置：API 密钥、地址、模型等通过 `.env` 文件设置
 
@@ -125,18 +135,30 @@ python extract_questions.py --dir ./pdf_images --start-from 174 --step 5 --conte
 | `API_KEY` | API 密钥 | — |
 | `API_URL` | API 地址 | `https://api.openai.com/v1` |
 | `MODEL_NAME` | 模型名称 | `gpt-4o` |
-| `IMAGES_PER_REQUEST` | 兼容旧模式：未指定 `--step` 时的总窗口页数 | `3` |
-| `CONTEXT_PAGES` | 指定 `--step` 时，前后附带的上下文页数 | `1` |
-| `RESPONSE_FORMAT` | `auto`、`json_object`、`text`；默认自动兼容后端 | `auto` |
-| `REQUEST_TIMEOUT` | 单次模型请求超时秒数 | `180` |
-| `REQUEST_RETRY_LIMIT` | 请求失败后的最大重试次数 | `6` |
-| `REQUEST_RETRY_BASE_DELAY` | 重试基础等待秒数，按次数递增 | `10` |
-| `BATCH_DELAY_SECONDS` | 批次之间固定等待秒数 | `5` |
-| `DEBUG_LOG_RAW_RESPONSE` | 是否在日志中打印原始响应预览 | `false` |
-| `RAW_RESPONSE_DIR` | 保存模型原始响应的目录 | 空 |
-| `TEMPERATURE` | 模型温度 | `0.1` |
-| `MAX_OUTPUT_TOKENS` | 最大输出 token | `8192` |
-| `ENABLE_JSON_MODE` | JSON 模式开关 | `true` |
+| `TEMPERATURE` | 模型温度 | `0.0` |
+| `RESPONSE_FORMAT` | 响应格式：text/none、json_object、json_schema、auto | `auto` |
+| `REQUEST_TIMEOUT` | 单次请求超时秒数 | `180` |
+| `API_CALL_INTERVAL` | API调用间隔时间（秒） | `3.0` |
+| `CONTEXT_PAGES_BEFORE` | 前面附带的上下文页数 | `1` |
+| `CONTEXT_PAGES_AFTER` | 后面附带的上下文页数 | `0` |
+| `CONSENSUS` | 是否启用共识机制（2次提取+AI裁决） | `true` |
+
+#### 产物目录结构
+
+使用 `ARTIFACT_DIR` + `ARTIFACT_NAME` 会自动创建完整的产物目录结构：
+
+```
+{ARTIFACT_DIR}/{ARTIFACT_NAME}/
+  ├── batch{N}_{首图}-{末图}/    # 每个批次的文件夹
+  │   ├── 1.json                  # 第1次提取响应
+  │   ├── 2.json                  # 第2次提取响应（共识模式）
+  │   ├── 1-2-diff.txt            # 批次内共识差异对比
+  │   ├── 1-2-llm.json            # 批次内AI判断结果
+  │   ├── overlapping_diff.txt    # 批次间重复页面差异
+  │   └── overlapping_llm.json    # 批次间AI判断结果
+  ├── run.log                     # 简要运行日志
+  └── {ARTIFACT_NAME}.json        # 最终题库文件
+```
 
 ## 完整流程
 

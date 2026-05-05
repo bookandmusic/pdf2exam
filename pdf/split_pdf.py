@@ -18,7 +18,10 @@ def split_pdf_to_images(pdf_path: str, output_folder: str | None = None, dpi: in
     if dpi <= 0:
         raise ValueError(f"dpi 必须大于 0，当前值: {dpi}")
 
-    output_dir = Path(output_folder).expanduser().resolve() if output_folder else pdf_file.with_name(f"{pdf_file.stem}_images")
+    if output_folder:
+        output_dir = Path(output_folder).expanduser().resolve()
+    else:
+        output_dir = pdf_file.with_name(f"{pdf_file.stem}_images")
     output_dir.mkdir(parents=True, exist_ok=True)
 
     with fitz.open(pdf_file) as doc:
